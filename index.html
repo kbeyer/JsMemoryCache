@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Example use of in-memory sliding Cache with auto-refresh</title>
+  <script type="text/javascript" src="Util.js"></script>
+  <script type="text/javascript" src="Logger.js"></script>
+  <script type="text/javascript" src="Hash.js"></script>
+  <script type="text/javascript" src="Cache.js"></script>
+</head>
+<body>
+  <textarea id="console" cols="50" rows="50" style="width: 100%; height: 100%;"></textarea>
+
+<script type="text/javascript">
+
+var memCache = new Cache();
+
+var newData = {
+  key: 'abc',
+  value: 0
+};
+
+// fast check (no expiration or autorefresh)
+var data = memCache.tryget(newData.key);
+if (data === false) {
+  
+  // create data refresh function
+  var fnRefresh = function (data, c) {
+      // NOTE: this is where an ajax call could be made to REST API
+      // to fetch fresh data
+
+      var updatedData = {
+        key: data.key,
+        value: data.value + 1
+      };
+      // update cache
+      memCache.update(data.key, updatedData);
+      // callback with new value
+      c(updatedData);
+  };
+
+  // add to cache ... expire in 3 seconds
+  memCache.add(newData, newData.key, 3, fnRefresh);
+
+}
+
+var printCurrent = function () {
+  // get from cache
+  memCache.get(newData.key, function (data) {
+    Logger.Info('current data.value: ' + data.value)
+  }, true); // and auto-refresh
+};
+// kickoff printing
+setInterval(printCurrent, 1000);
+
+</script>
+</body>
+</html>
