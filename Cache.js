@@ -35,21 +35,22 @@ Cache.prototype.add = function (o, k, t, r) {
 // @o - the new value for the item
 // @t - (optional) update to seconds object should live in cache
 Cache.prototype.update = function (k, o, t) {
-    if (Util.IsNullOrUndefined(k)) { return false; }
+    if (Util.IsNullOrUndefined(k) || Util.IsNullOrUndefined(this.dataHash[k])) {
+        return false;
+    } 
     // update obj
-    if (!Util.IsNullOrUndefined(this.dataHash[k])) {
-        // update value
-        this.dataHash[k].val = o;
-        // update born on date
-        this.dataHash[k].born = new Date();
-        // check if ttl should be updated
-        if (t !== undefined && t > 0) {
-            this.dataHash[k].ttl = t * 1000;
-        }
-        //Logger.Log("Cache UPDATE. key: " + k);
-        return true;
+    
+    // update value
+    this.dataHash[k].val = o;
+    // update born on date
+    this.dataHash[k].born = new Date();
+    // check if ttl should be updated
+    if (t !== undefined && t > 0) {
+        this.dataHash[k].ttl = t * 1000;
     }
-    return false;
+    //Logger.Log("Cache UPDATE. key: " + k);
+    return true;
+   
 };
 
 // tries to get an object directly from cache w/o going through expiration and auto-refresh checks
@@ -58,8 +59,8 @@ Cache.prototype.update = function (k, o, t) {
 Cache.prototype.tryget = function (k) {
     if (Util.IsNullOrUndefined(k)) { return false; }
     var cObj = this.dataHash[k];
-    if (!Util.IsNullOrUndefined(cObj)) { return cObj.val; }
-    return false;
+    
+    return Util.IsNullOrUndefined(cObj) ? false : cObj.val;
 };
 
 // gets an item from the cache
@@ -69,43 +70,45 @@ Cache.prototype.tryget = function (k) {
 // @r - flag to indicate if refresh should be called on item expiration
 Cache.prototype.get = function (k, c, r) {
     if (Util.IsNullOrUndefined(k) || typeof (c) !== 'function') { return false; }
-    var curDt = new Date();
+    
     // first find item
     var cObj = this.dataHash[k];
-    if (!Util.IsNullOrUndefined(cObj)) {
-        // check if item expired
-        if (curDt.getTime() < (cObj.born.getTime() + cObj.ttl)) {
-            // return existing
-            c(cObj.val);
-            //Logger.Log("Cache Hit! key: " + k);
-        } else {
-            if (r === true) {
-                if (typeof (cObj.refresh) === 'function') {
-                    // refresh & let refresh function return value via callback
-                    cObj.refresh(cObj.val, c);
-                    //Logger.Log("Cache Hit! But expired.  Auto-refreshing. key: " + k);
-                } else {
-                    // remove object completely
-                    this.dataHash[k] = null;
-                    // return null
-                    c(null);
-                    Logger.Log("Cache Hit! But expired. Can't refresh. Returning NULL. key: " + k);
-                }
-            } else {
-                // return existing [auto-refresh wasn't requested]
-                c(cObj.val);
-                //Logger.Log("Cache Hit! But expired. No Refresh. Return existing. key: " + k);
-            }
-        }
-    } else {
+    if (Util.IsNullOrUndefined(cObj)) {
         //Logger.Log("Cache MISS! key: " + k);
     
         // TODO: should this send null to the callback function? (and risk double callback potential)
         // OR is it safer to just return false and expect the caller to handle that
-        c(null);
+        c.call(null, null);
         return false;
     }
-
+    
+    // check if item expired
+    var curDt = new Date();
+    if (curDt.getTime() < (cObj.born.getTime() + cObj.ttl)) {
+        // return existing
+        c.call(null, cObj.val);
+        //Logger.Log("Cache Hit! key: " + k);
+        return true;
+    } 
+    
+    if (r === true) {
+        if (typeof (cObj.refresh) === 'function') {
+            // refresh & let refresh function return value via callback
+            cObj.refresh.call(null, cObj.val, c);
+            //Logger.Log("Cache Hit! But expired.  Auto-refreshing. key: " + k);
+        } else {
+            // remove object completely
+            this.dataHash[k] = null;
+            // return null
+            c.call(null, null);
+            Logger.Log("Cache Hit! But expired. Can't refresh. Returning NULL. key: " + k);
+        }
+    } else {
+        // return existing [auto-refresh wasn't requested]
+        c.call(null, cObj.val);
+        //Logger.Log("Cache Hit! But expired. No Refresh. Return existing. key: " + k);
+    }
+    
     return true;
 };
 
