@@ -2,6 +2,8 @@
 /*global Hash*/     // used as base data structure
 /*global Logger*/   // used to capture info/errors
 
+'use strict';
+
 // CacheObj stores the meta-data used by Cache for understanding
 // the current state of a cached object. Only used by Cache.
 // @obj         - the object being cached
@@ -9,7 +11,7 @@
 // @born        - timestamp when object was added to cache
 // @ttl         - number of milliseconds before object needs refreshed
 // @refreshFn   - function that will be called when object needs updated 
-function CacheObj(obj, key, born, ttl, refreshFn) {
+function CacheObj(key, obj, born, ttl, refreshFn) {
     this.key = key;
     this.val = obj;
     this.born = born;
@@ -26,14 +28,14 @@ function Cache() {
 Cache.version = 0.2; // merged changes from bruslim/patch-1, reformatting, more docs
 
 // adds an item to the cache
-// @o - the value of the item to add
 // @k - the key for the item
+// @o - the value of the item to add
 // @t - number of seconds until item expires
 // @r - the function to call when the item needs refreshed
-Cache.prototype.add = function (o, k, t, r) {
+Cache.prototype.add = function (k, o, t, r) {
     if (t <= 0 || Util.IsNullOrUndefined(k)) { return false; }
     // add to data hash
-    this.dataHash[k] = new CacheObj(o, k, new Date(), t * 1000, r);
+    this.dataHash[k] = new CacheObj(k, o, new Date(), t * 1000, r);
     //Logger.Log("Cache ADD. key: " + k);
     return true;
 };
@@ -62,12 +64,21 @@ Cache.prototype.update = function (k, o, t) {
 
 // tries to get an object directly from cache w/o going through expiration and auto-refresh checks
 // @k - the key for the item
-// returns the object if found else false
-Cache.prototype.tryget = function (k) {
-    if (Util.IsNullOrUndefined(k)) { return false; }
+// @c - the callback function to use for returning values
+// returns true if found else false
+Cache.prototype.tryGet = function (k, c) {
+    if (Util.IsNullOrUndefined(k)) {
+        if (typeof (c) === 'function') {
+            c.call(null, null)
+        }
+        return false;
+    }
     var cObj = this.dataHash[k];
-    
-    return Util.IsNullOrUndefined(cObj) ? false : cObj.val;
+    var value = Util.IsNullOrUndefined(cObj) ? null : cObj.val;
+    if (typeof (c) === 'function') {
+        c.call(null, value)
+    }
+    return value === null;
 };
 
 // gets an item from the cache
@@ -76,32 +87,21 @@ Cache.prototype.tryget = function (k) {
 // @c - the callback function to use for returning values
 // @r - flag to indicate if refresh should be called on item expiration
 Cache.prototype.get = function (k, c, r) {
-    if (Util.IsNullOrUndefined(k) ||
-        typeof (c) !== 'function') {
+    if (typeof (c) !== 'function') {
         return false;
     }
-    
-    // first find item
-    var cObj = this.dataHash[k];
-    if (Util.IsNullOrUndefined(cObj)) {
-        //Logger.Log("Cache MISS! key: " + k);
-    
-        // TODO: should this send null to the callback function? (and risk double callback potential)
-        // OR is it safer to just return false and expect the caller to handle that
-        c.call(null, null);
-        return false;
-    }
-    
-    // check if item expired
-    var curDt = new Date();
-    if (curDt.getTime() < (cObj.born.getTime() + cObj.ttl)) {
-        // return existing
-        c.call(null, cObj.val);
-        //Logger.Log("Cache Hit! key: " + k);
-        return true;
-    } 
-    
-    if (r === true) {
+    return this.tryget(k, function(value) {
+        var curDt = new Date();
+        // if value is null or no auto-refresh or if item expired
+        if (!value || 
+            !r || 
+            curDt.getTime() < (cObj.born.getTime() + cObj.ttl)) {
+            // return existing
+            c.call(null, value);
+            //Logger.Log("Cache Hit! key: " + k);
+            return; // exit callback
+        } 
+        
         if (typeof (cObj.refresh) === 'function') {
             // refresh & let refresh function return value via callback
             cObj.refresh.call(null, cObj.val, c);
@@ -113,20 +113,21 @@ Cache.prototype.get = function (k, c, r) {
             c.call(null, null);
             Logger.Log("Cache Hit! But expired. Can't refresh. Returning NULL. key: " + k);
         }
-    } else {
-        // return existing [auto-refresh wasn't requested]
-        c.call(null, cObj.val);
-        //Logger.Log("Cache Hit! But expired. No Refresh. Return existing. key: " + k);
-    }
-    
-    return true;
+        
+    });
 };
 
 // removes an item from cache
-Cache.prototype.remove = function (k) {
-    if (Util.IsNullOrUndefined(k)) { return false; }
-    // set key to null
-    this.dataHash[k] = null;
-    //Logger.Log("Cache ADD. key: " + k);
-    return true;
+Cache.prototype.remove = function (k, c) {
+    return this.tryget(k, function(value){
+        if (this.dataHash[k] !== undefined) {
+            // remove the key with delete
+            delete(this.dataHash[k]);
+        }
+        // if callback was provided, call it with the value
+        if (typeof (c) === 'function') {
+            c.call(null, value)
+        }
+        //Logger.Log("Cache ADD. key: " + k);
+    })
 };
