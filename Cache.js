@@ -90,7 +90,7 @@ Cache.prototype.get = function (k, c, r) {
     if (typeof (c) !== 'function') {
         return false;
     }
-    return this.tryget(k, function(value) {
+    return this.tryGet(k, function(value) {
         var curDt = new Date();
         // if value is null or no auto-refresh or if item expired
         if (!value || 
@@ -119,7 +119,7 @@ Cache.prototype.get = function (k, c, r) {
 
 // removes an item from cache
 Cache.prototype.remove = function (k, c) {
-    return this.tryget(k, function(value){
+    return this.tryGet(k, function(value){
         if (this.dataHash[k] !== undefined) {
             // remove the key with delete
             delete(this.dataHash[k]);
