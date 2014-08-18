@@ -2,12 +2,19 @@
 /*global Hash*/     // used as base data structure
 /*global Logger*/   // used to capture info/errors
 
-function CacheObj(o, k, b, t, r) {
-    this.key = k;
-    this.val = o;
-    this.born = b;
-    this.ttl = t;
-    this.refresh = r;
+// CacheObj stores the meta-data used by Cache for understanding
+// the current state of a cached object. Only used by Cache.
+// @obj         - the object being cached
+// @key         - key used to access the object
+// @born        - timestamp when object was added to cache
+// @ttl         - number of milliseconds before object needs refreshed
+// @refreshFn   - function that will be called when object needs updated 
+function CacheObj(obj, key, born, ttl, refreshFn) {
+    this.key = key;
+    this.val = obj;
+    this.born = born;
+    this.ttl = ttl;
+    this.refresh = refreshFn;
 }
 
 function Cache() {
@@ -15,7 +22,8 @@ function Cache() {
     this.dataHash = new Hash();
 }
 
-Cache.version = 0.1; // initial version
+//Cache.version = 0.1; // initial version
+Cache.version = 0.2; // merged changes from bruslim/patch-1, reformatting, more docs
 
 // adds an item to the cache
 // @o - the value of the item to add
