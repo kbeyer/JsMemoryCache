@@ -35,11 +35,10 @@ Cache.prototype.add = function (o, k, t, r) {
 // @o - the new value for the item
 // @t - (optional) update to seconds object should live in cache
 Cache.prototype.update = function (k, o, t) {
-    if (Util.IsNullOrUndefined(k) || Util.IsNullOrUndefined(this.dataHash[k])) {
+    if (Util.IsNullOrUndefined(k) ||
+        Util.IsNullOrUndefined(this.dataHash[k])) {
         return false;
-    } 
-    // update obj
-    
+    }
     // update value
     this.dataHash[k].val = o;
     // update born on date
@@ -69,7 +68,10 @@ Cache.prototype.tryget = function (k) {
 // @c - the callback function to use for returning values
 // @r - flag to indicate if refresh should be called on item expiration
 Cache.prototype.get = function (k, c, r) {
-    if (Util.IsNullOrUndefined(k) || typeof (c) !== 'function') { return false; }
+    if (Util.IsNullOrUndefined(k) ||
+        typeof (c) !== 'function') {
+        return false;
+    }
     
     // first find item
     var cObj = this.dataHash[k];
