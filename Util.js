@@ -8,6 +8,13 @@ Util.IsNullOrUndefined = function (o) {
     return o === undefined || o === null;
 };
 
+// checks if callback is a function
+// if so, calls it with specified value
+Util.TryInvoke = function (callback, value) {
+    if (typeof (callback) === 'function') {
+      callback.call(null, value);
+    }
+};
 
 function StackFrame(funcName, funcSource, flName, lnNumber) {
     this.functionName = funcName;

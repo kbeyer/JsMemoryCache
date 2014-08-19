@@ -4,17 +4,10 @@
 
 // use var Cache to create Cache object in global scope
 // use self-invoking annonymous function to encapsulate local scope
-;(function(global, Util, Hash, Logger) {
+;(function (global, Util, Hash, Logger) {
   
   // this function scope is in strict mode
   "use strict";
-
-  // local function try invoke
-  function tryInvoke(callback, value) {
-    if (typeof (callback) === 'function') {
-      callback.call(null, value);
-    }
-  }
   
   // CacheObj stores the meta-data used by Cache for understanding
   // the current state of a cached object. Only used by Cache.
@@ -23,7 +16,7 @@
   // @born        - timestamp when object was added to cache
   // @ttl         - number of milliseconds before object needs refreshed
   // @refreshFn   - function that will be called when object needs updated 
-  var CacheObj = global.CacheObj = function(key, obj, born, ttl, refreshFn) {
+  var CacheObj = global.CacheObj = function (key, obj, born, ttl, refreshFn) {
     this.key = key;
     this.val = obj;
     this.born = born;
@@ -31,13 +24,14 @@
     this.refresh = refreshFn;
   };
 
-  var Cache = global.Cache = function() {
+  var Cache = global.Cache = function () {
     // data cache
     this.dataHash = new Hash();
   };
 
   //Cache.version = 0.1; // initial version
-  Cache.version = 0.2; // merged changes from bruslim/patch-1, reformatting, more docs
+  //Cache.version = 0.2; // merged changes from bruslim/patch-1, reformatting, more docs
+  Cache.version = 0.3; // changes from bruslim/patch-2, bug fixes, example updates
 
   // adds an item to the cache
   // @k - the key for the item
@@ -78,14 +72,14 @@
    * @param k {string} - Key for the item
    * @param [c] {function} - callback to call with value
    */
-  Cache.prototype._tryGet = function(k, c) {
+  Cache.prototype._tryGet = function (k, c) {
     if (Util.IsNullOrUndefined(k)) {
-      tryInvoke(c, undefined);
+      Util.TryInvoke(c, undefined);
       return false;
     }
     var cObj = this.dataHash[k];
-    tryInvoke(c, cObj);
-    return Util.IsNullOrUndefined(cObj) && cObj.val !== null;
+    Util.TryInvoke(c, cObj);
+    return !Util.IsNullOrUndefined(cObj) && !Util.IsNullOrUndefined(cObj.val);
   };
 
   // tries to get an object directly from cache w/o going through expiration and auto-refresh checks
@@ -93,10 +87,8 @@
   // @c - the callback function to use for returning values
   // returns true if found else false
   Cache.prototype.tryGet = function (k, c) {
-    return this._tryGet(k, function(cObj) {
-      if (typeof (c) === 'function') {
-        c.call(null, cObj.val);
-      }
+    return this._tryGet(k, function (cObj) {
+      Util.TryInvoke(c, cObj);
     });
   };
 
@@ -109,23 +101,23 @@
     if (typeof (c) !== 'function') {
       return false;
     }
-    return this._tryGet(k, function(cObj) {
+    return this._tryGet(k, function (cObj) {
       // if cObj is undefined or null
-      if (!cObj) {
+      if (Util.IsNullOrUndefined(cObj)) {
         c.call(null, null);
       }
 
-      // if value is null or no auto-refresh or if item expired
-      if (!Util.IsNullOrUndefined(cObj.val) || 
-          !r || 
-          (new Date()).getTime() < (cObj.born.getTime() + cObj.ttl)) {
-        // return existing
+      // if item is not expired
+      if ((new Date()).getTime() < (cObj.born.getTime() + cObj.ttl)) {
+        // return existing value
         c.call(null, cObj.val);
         //Logger.Log("Cache Hit! key: " + k);
         return; // exit callback
       } 
 
-      if (typeof (cObj.refresh) === 'function') {
+      // if refresh is requested with valid function
+      if (r === true &&
+          typeof (cObj.refresh) === 'function') {
         // refresh & let refresh function return value via callback
         cObj.refresh.call(null, cObj.val, c);
         //Logger.Log("Cache Hit! But expired.  Auto-refreshing. key: " + k);
@@ -141,7 +133,7 @@
 
   // removes an item from cache
   Cache.prototype.remove = function (k, c) {
-    return this._tryGet(k, function(cObj){
+    return this._tryGet(k, function (cObj) {
       if (cObj !== undefined) {
         // remove the key with delete
         delete(this.dataHash[k]); 
@@ -150,7 +142,7 @@
         // the same as this.dataHash.whateverKIs
       }
       // if callback was provided, call it with the value
-      tryInvoke(c, cObj.val);
+      Util.TryInvoke(c, cObj.val);
       //Logger.Log("Cache ADD. key: " + k);
     });
   };

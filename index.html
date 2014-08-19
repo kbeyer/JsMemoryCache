@@ -20,9 +20,10 @@ var newData = {
 };
 
 // fast check (no expiration or autorefresh)
-var data = memCache.tryget(newData.key);
-if (data === false) {
-  
+var data = memCache.tryGet(newData.key, function (existingData) {
+  // NOTE: typically an existing value will be used...
+  if (!Util.IsNullOrUndefined(existingData)) { return; }
+
   // create data refresh function
   var fnRefresh = function (data, c) {
       // NOTE: this is where an ajax call could be made to REST API
@@ -39,9 +40,9 @@ if (data === false) {
   };
 
   // add to cache ... expire in 3 seconds
-  memCache.add(newData, newData.key, 3, fnRefresh);
+  memCache.add(newData.key, newData, 3, fnRefresh);
 
-}
+});
 
 var printCurrent = function () {
   // get from cache
